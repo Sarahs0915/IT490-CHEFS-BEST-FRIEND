@@ -1,0 +1,14 @@
+/home/pablob123/IT490/bin/Debug/net10.0/IT490
+/home/pablob123/IT490/bin/Debug/net10.0/IT490.deps.json
+/home/pablob123/IT490/bin/Debug/net10.0/IT490.runtimeconfig.json
+/home/pablob123/IT490/bin/Debug/net10.0/IT490.dll
+/home/pablob123/IT490/bin/Debug/net10.0/IT490.pdb
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.GeneratedMSBuildEditorConfig.editorconfig
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.AssemblyInfoInputs.cache
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.AssemblyInfo.cs
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.csproj.CoreCompileInputs.cache
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.dll
+/home/pablob123/IT490/obj/Debug/net10.0/refint/IT490.dll
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.pdb
+/home/pablob123/IT490/obj/Debug/net10.0/IT490.genruntimeconfig.cache
+/home/pablob123/IT490/obj/Debug/net10.0/ref/IT490.dll

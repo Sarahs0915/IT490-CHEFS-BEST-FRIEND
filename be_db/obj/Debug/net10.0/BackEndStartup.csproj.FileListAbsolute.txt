@@ -1,0 +1,14 @@
+/home/pablob123/IT490/bin/Debug/net10.0/BackEndStartup
+/home/pablob123/IT490/bin/Debug/net10.0/BackEndStartup.deps.json
+/home/pablob123/IT490/bin/Debug/net10.0/BackEndStartup.runtimeconfig.json
+/home/pablob123/IT490/bin/Debug/net10.0/BackEndStartup.dll
+/home/pablob123/IT490/bin/Debug/net10.0/BackEndStartup.pdb
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.GeneratedMSBuildEditorConfig.editorconfig
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.AssemblyInfoInputs.cache
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.AssemblyInfo.cs
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.csproj.CoreCompileInputs.cache
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.dll
+/home/pablob123/IT490/obj/Debug/net10.0/refint/BackEndStartup.dll
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.pdb
+/home/pablob123/IT490/obj/Debug/net10.0/BackEndStartup.genruntimeconfig.cache
+/home/pablob123/IT490/obj/Debug/net10.0/ref/BackEndStartup.dll
