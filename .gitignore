@@ -1,2 +1,5 @@
 *.rbc
 *.fyc
+*config.php
+*vendor/
+*mock_backend.php
