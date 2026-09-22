@@ -1,37 +1,84 @@
+
 <?php
 session_start();
 require_once __DIR__ . '/rmq_client.php';
-
+ 
 function h(?string $s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
-
+ 
 // CSRF token
 if (empty($_SESSION['csrf'])) {
     $_SESSION['csrf'] = bin2hex(random_bytes(16));
 }
-
-// Names must match TheMealDB ingredients
+ 
+// Names must match TheMealDB ingredient naming (underscores for spaces)
 $pantryOptions = [
     'chicken_breast' => 'Chicken Breast',
+    'ground_beef'    => 'Ground Beef',
+    'bacon'          => 'Bacon',
+    'salmon'         => 'Salmon',
+    'shrimp'         => 'Shrimp',
+    'eggs'           => 'Eggs',
     'rice'           => 'White Rice',
+    'pasta'          => 'Pasta',
+    'bread'          => 'Bread',
+    'potatoes'       => 'Potatoes',
     'garlic'         => 'Garlic',
     'onion'          => 'Yellow Onion',
     'tomato'         => 'Tomatoes',
+    'bell_pepper'    => 'Bell Pepper',
+    'carrot'         => 'Carrots',
+    'spinach'        => 'Spinach',
+    'broccoli'       => 'Broccoli',
+    'mushroom'       => 'Mushrooms',
+    'butter'         => 'Butter',
+    'milk'           => 'Milk',
+    'cheddar_cheese' => 'Cheddar Cheese',
+    'parmesan'       => 'Parmesan',
     'olive_oil'      => 'Olive Oil',
+    'salt'           => 'Salt',
+    'black_pepper'   => 'Black Pepper',
+    'lemon'          => 'Lemon',
+    'lime'           => 'Lime',
+    'flour'          => 'Flour',
+    'sugar'          => 'Sugar',
+    'cinnamon'       => 'Cinnamon',
+    'cumin'          => 'Cumin',
+    'paprika'        => 'Paprika',
+    'soy_sauce'      => 'Soy Sauce',
+    'vinegar'        => 'Vinegar',
+    'honey'          => 'Honey',
+    'yogurt'         => 'Yogurt',
+    'lettuce'        => 'Lettuce',
+    'cucumber'       => 'Cucumber',
+    'zucchini'       => 'Zucchini',
+    'corn'           => 'Corn',
+    'black_beans'    => 'Black Beans',
+    'oats'           => 'Oats',
+    'apple'          => 'Apple',
+    'banana'         => 'Banana',
+    'avocado'        => 'Avocado',
+    'ginger'         => 'Ginger',
+    'chili_powder'   => 'Chili Powder',
+    'basil'          => 'Basil',
+    'ketchup'        => 'Ketchup',
+    'mustard'        => 'Mustard',
+    'mayonnaise'     => 'Mayonnaise',
+    'tortilla'       => 'Tortilla',
 ];
-
+ 
 // Local, in-session mirror of pantry state so the UI can render quantities /
 // shelf-life immediately after a round trip through the Database Node.
 // The authoritative copy always lives behind the RabbitMQ pantry queues.
 if (!isset($_SESSION['pantry_state']) || !is_array($_SESSION['pantry_state'])) {
     $_SESSION['pantry_state'] = [];
 }
-
+ 
 $isLoggedIn = !empty($_SESSION['user']);
-
+ 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $flash  = ['type' => 'error', 'message' => 'Unknown action'];
-
+ 
     if (!hash_equals($_SESSION['csrf'], $_POST['csrf'] ?? '')) {
         $flash = ['type' => 'error', 'message' => 'Invalid form token, please try again.'];
     } else {
@@ -41,22 +88,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 session_regenerate_id(true);
                 $_SESSION['csrf'] = bin2hex(random_bytes(16));
                 $flash = ['type' => 'ok', 'message' => 'Logged out.'];
-
+ 
             } else {
                 $client = new RabbitRPCClient();
-
+ 
                 if ($action === 'ping_test') {
                     $resp = $client->call('ping', ['sender' => 'FE_Node', 'timestamp' => time()]);
                     $flash = [
                         'type'    => ($resp['status'] ?? '') === 'error' ? 'error' : 'ok',
                         'message' => 'Received from RMQ: ' . json_encode($resp),
                     ];
-
+ 
                 } elseif ($action === 'register') {
                     $username = trim($_POST['reg_username'] ?? '');
                     $password = $_POST['reg_password'] ?? '';
                     $confirm  = $_POST['reg_confirm'] ?? '';
-
+ 
                     if ($username === '' || $password === '') {
                         $flash = ['type' => 'error', 'message' => 'Username and password are required.'];
                     } elseif ($password !== $confirm) {
@@ -73,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $flash = ['type' => 'error', 'message' => $resp['message'] ?? 'Registration failed'];
                         }
                     }
-
+ 
                 } elseif ($action === 'login') {
                     $resp = $client->call('login', [
                         'username' => trim($_POST['username'] ?? ''),
@@ -90,24 +137,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $flash = ['type' => 'error', 'message' => $resp['message'] ?? 'Login failed'];
                     }
-
+ 
                 } elseif ($action === 'pantry_save') {
-                    // Smart Pantry Inventory: quantity + shelf-life (expiration) per item.
+                    // Smart Pantry Inventory: search-box add, one ingredient at a time.
+                    // Typed text is matched (case-insensitively) against the known
+                    // ingredient list first, so predictive/autocompleted picks map
+                    // to TheMealDB's canonical naming; anything unrecognized is
+                    // normalized into a same-style key so users can still log
+                    // pantry items TheMealDB doesn't know about.
+                    $raw = trim($_POST['ingredient'] ?? '');
+                    $qty = isset($_POST['qty']) ? (int)$_POST['qty'] : 1;
                     $items = [];
-                    foreach ($pantryOptions as $key => $label) {
-                        if (!empty($_POST['pantry'][$key])) {
-                            $qty = isset($_POST['qty'][$key]) ? (int)$_POST['qty'][$key] : 1;
-                            $exp = trim($_POST['expires'][$key] ?? '');
-                            $items[$key] = [
-                                'label'    => $label,
+ 
+                    if ($raw !== '') {
+                        $matchKey = null;
+                        foreach ($pantryOptions as $key => $label) {
+                            if (strcasecmp($label, $raw) === 0) {
+                                $matchKey = $key;
+                                break;
+                            }
+                        }
+                        if ($matchKey === null) {
+                            $custom = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '_', $raw), '_'));
+                            $matchKey = $custom !== '' ? $custom : null;
+                        }
+                        if ($matchKey !== null) {
+                            $items[$matchKey] = [
+                                'label'    => $pantryOptions[$matchKey] ?? $raw,
                                 'quantity' => max(1, $qty),
-                                'expires'  => $exp, // YYYY-MM-DD, empty = no tracked shelf-life
                             ];
                         }
                     }
-
+ 
                     if (!$items) {
-                        $flash = ['type' => 'error', 'message' => 'Select at least one ingredient to add to your pantry.'];
+                        $flash = ['type' => 'error', 'message' => 'Type or select an ingredient to add to your pantry.'];
                     } else {
                         $resp = $client->call('pantry_save', [
                             'items'         => $items,
@@ -121,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $flash = ['type' => 'error', 'message' => $resp['message'] ?? 'Could not save pantry.'];
                         }
                     }
-
+ 
                 } elseif ($action === 'pantry_remove') {
                     $key = $_POST['item'] ?? '';
                     if ($key && isset($_SESSION['pantry_state'][$key])) {
@@ -134,7 +197,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $flash = ['type' => 'error', 'message' => 'Item not found in pantry.'];
                     }
-
+ 
                 } elseif ($action === 'pantry_match') {
                     // Instant Recipe Matching against everything currently in the pantry.
                     $selected = array_keys($_SESSION['pantry_state']);
@@ -156,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $flash = ['type' => 'error', 'message' => $resp['message'] ?? 'Matching failed'];
                         }
                     }
-
+ 
                 } elseif ($action === 'grocery_list') {
                     // Missing Ingredient & Grocery Generator: diff selected recipes'
                     // required ingredients against current pantry state.
@@ -185,16 +248,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (\Throwable $e) {
             // Log details server-side, show a generic message to the user
             error_log('FE error: ' . $e->getMessage());
-            $flash = ['type' => 'error', 'message' => 'Could not reach the backend. Is RabbitMQ up?'];
+            $flash = ['type' => 'error', 'message' => 'Could not reach the backend. Check RabbitMQ connectivity.'];
         }
     }
-
+ 
     // Post/Redirect/Get
     $_SESSION['flash'] = $flash;
     header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
     exit;
 }
-
+ 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 $isLoggedIn = !empty($_SESSION['user']);
@@ -208,42 +271,40 @@ $lastMeals = $flash['meals'] ?? ($_SESSION['last_meals'] ?? []);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Chef's Best Friend - IT490</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f8f9fa; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #202124; color: #e8eaed; }
+        h1, h3, h4 { color: #f1f3f4; }
+        a { color: #8ab4f8; }
+        .card { background: #2c2d30; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.4); margin-bottom: 20px; border: 1px solid #3c3d40; }
         button { background-color: #007bff; color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; }
-        button.secondary { background-color: #6c757d; }
+        button.secondary { background-color: #5f6368; }
         button.danger { background-color: #dc3545; padding: 4px 10px; font-size: 12px; }
-        .pantry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
-        .pantry-item { border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; }
-        .pantry-item input[type="number"], .pantry-item input[type="date"] { width: 100%; margin-top: 4px; font-size: 12px; }
+        input[type="text"], input[type="password"], input[type="number"] {
+            background-color: #3c3d40; color: #e8eaed; border: 1px solid #55565a; border-radius: 4px; padding: 6px 8px;
+        }
+        .pantry-search { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+        .pantry-search input[type="text"] { flex: 1; min-width: 200px; }
+        .pantry-search input[type="number"] { width: 80px; }
         .status { padding: 10px; border-radius: 4px; margin-bottom: 20px; }
-        .status.ok { background: #d4edda; } .status.error { background: #f8d7da; }
+        .status.ok { background: #1e3a2b; color: #a6e9bd; border: 1px solid #2e6b47; }
+        .status.error { background: #402326; color: #f5a3a8; border: 1px solid #7a3338; }
         .meals { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
         .meal img { width: 100%; border-radius: 6px; } .meal span { display: block; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 14px; }
+        th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #3c3d40; font-size: 14px; }
         .auth-flex { display: flex; gap: 24px; flex-wrap: wrap; }
         .auth-flex form { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 8px; }
-        .missing { background: #fff3cd; }
+        .missing { background: #4a3f1c; }
+        .muted { color: #9aa0a6; }
     </style>
 </head>
 <body>
     <h1>Chef's Best Friend 🍳</h1>
-    <p style="color:#6c757d;">Distributed pantry &amp; recipe matching over RabbitMQ RPC — IT490 Systems Integration</p>
-
+    <p class="muted">Distributed pantry &amp; recipe matching </p>
+ 
     <?php if ($flash): ?>
         <div class="status <?= h($flash['type']) ?>"><strong>Response:</strong> <?= h($flash['message']) ?></div>
     <?php endif; ?>
-
-    <div class="card">
-        <h3>Communication Layer Test</h3>
-        <form method="POST">
-            <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-            <input type="hidden" name="action" value="ping_test">
-            <button type="submit">Send AMQP Ping to Cluster</button>
-        </form>
-    </div>
-
+ 
     <div class="card">
         <h3>User Account</h3>
         <?php if ($isLoggedIn): ?>
@@ -254,53 +315,48 @@ $lastMeals = $flash['meals'] ?? ($_SESSION['last_meals'] ?? []);
                 <button type="submit">Sign Out</button>
             </form>
         <?php else: ?>
-            <div class="auth-flex">
-                <form method="POST">
-                    <strong>Sign In</strong>
-                    <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-                    <input type="hidden" name="action" value="login">
-                    <input type="text" name="username" placeholder="Username" required>
-                    <input type="password" name="password" placeholder="Password" required>
-                    <button type="submit">Sign In</button>
-                </form>
-                <form method="POST">
-                    <strong>Create Account</strong>
-                    <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-                    <input type="hidden" name="action" value="register">
-                    <input type="text" name="reg_username" placeholder="Choose a username" required>
-                    <input type="password" name="reg_password" placeholder="Password" required minlength="8">
-                    <input type="password" name="reg_confirm" placeholder="Confirm password" required minlength="8">
-                    <button type="submit" class="secondary">Register</button>
-                </form>
-            </div>
+            <form method="POST">
+                <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+                <input type="hidden" name="action" value="login">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit">Sign In</button>
+            </form>
+            <p class="muted" style="margin-top:12px;">
+                Don't have an account? <a href="#register">Create an Account</a>
+            </p>
         <?php endif; ?>
     </div>
-
+ 
     <div class="card">
         <h3>Smart Pantry Inventory</h3>
-        <form method="POST">
+        <form method="POST" class="pantry-search">
             <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
             <input type="hidden" name="action" value="pantry_save">
-            <div class="pantry-grid">
-                <?php foreach ($pantryOptions as $value => $label): ?>
-                    <div class="pantry-item">
-                        <label><input type="checkbox" name="pantry[<?= h($value) ?>]" value="1"> <?= h($label) ?></label>
-                        <input type="number" name="qty[<?= h($value) ?>]" min="1" value="1" title="Quantity">
-                        <input type="date" name="expires[<?= h($value) ?>]" title="Shelf-life / expires">
-                    </div>
+            <input
+                type="text"
+                name="ingredient"
+                list="ingredient-options"
+                placeholder="Search for an ingredient…"
+                autocomplete="off"
+                required
+            >
+            <datalist id="ingredient-options">
+                <?php foreach ($pantryOptions as $label): ?>
+                    <option value="<?= h($label) ?>">
                 <?php endforeach; ?>
-            </div>
-            <button type="submit">Save to Pantry</button>
+            </datalist>
+            <input type="number" name="qty" min="1" value="1" title="Quantity">
+            <button type="submit">Add to Pantry</button>
         </form>
-
+ 
         <?php if ($pantryState): ?>
             <table>
-                <tr><th>Ingredient</th><th>Qty</th><th>Expires</th><th></th></tr>
+                <tr><th>Ingredient</th><th>Qty</th><th></th></tr>
                 <?php foreach ($pantryState as $key => $item): ?>
                     <tr>
                         <td><?= h($item['label'] ?? $key) ?></td>
                         <td><?= h((string)($item['quantity'] ?? 1)) ?></td>
-                        <td><?= h($item['expires'] ?: '—') ?></td>
                         <td>
                             <form method="POST" style="display:inline;">
                                 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
@@ -313,10 +369,10 @@ $lastMeals = $flash['meals'] ?? ($_SESSION['last_meals'] ?? []);
                 <?php endforeach; ?>
             </table>
         <?php else: ?>
-            <p style="color:#6c757d;">Your pantry is empty. Add ingredients above.</p>
+            <p class="muted">Your pantry is empty. Search for an ingredient above to add it.</p>
         <?php endif; ?>
     </div>
-
+ 
     <div class="card">
         <h3>Instant Recipe Matching</h3>
         <form method="POST">
@@ -324,7 +380,7 @@ $lastMeals = $flash['meals'] ?? ($_SESSION['last_meals'] ?? []);
             <input type="hidden" name="action" value="pantry_match">
             <button type="submit">Find Recipes From My Pantry</button>
         </form>
-
+ 
         <?php if ($lastMeals): ?>
             <form method="POST">
                 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
@@ -347,7 +403,7 @@ $lastMeals = $flash['meals'] ?? ($_SESSION['last_meals'] ?? []);
                 </p>
             </form>
         <?php endif; ?>
-
+ 
         <?php if (!empty($flash['missing'])): ?>
             <h4>Missing Ingredients / Grocery List</h4>
             <table>
@@ -361,5 +417,29 @@ $lastMeals = $flash['meals'] ?? ($_SESSION['last_meals'] ?? []);
             </table>
         <?php endif; ?>
     </div>
+ 
+    <?php if (!$isLoggedIn): ?>
+    <div class="card" id="register">
+        <h3>Create an Account</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+            <input type="hidden" name="action" value="register">
+            <input type="text" name="reg_username" placeholder="Choose a username" required>
+            <input type="password" name="reg_password" placeholder="Password" required minlength="8">
+            <input type="password" name="reg_confirm" placeholder="Confirm password" required minlength="8">
+            <button type="submit" class="secondary">Register</button>
+        </form>
+    </div>
+    <?php endif; ?>
+ 
+    <div class="card">
+        <h3>Communication Layer Test</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+            <input type="hidden" name="action" value="ping_test">
+            <button type="submit">Send AMQP Ping to Cluster</button>
+        </form>
+    </div>
 </body>
 </html>
+ 
