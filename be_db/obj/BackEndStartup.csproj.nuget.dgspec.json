@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/home/pablob123/IT490/BackEndStartup.csproj": {}
+    "/home/pablob123/IT490 Project/IT490-CHEFS-BEST-FRIEND/be_db/BackEndStartup.csproj": {}
   },
   "projects": {
-    "/home/pablob123/IT490/BackEndStartup.csproj": {
+    "/home/pablob123/IT490 Project/IT490-CHEFS-BEST-FRIEND/be_db/BackEndStartup.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/home/pablob123/IT490/BackEndStartup.csproj",
+        "projectUniqueName": "/home/pablob123/IT490 Project/IT490-CHEFS-BEST-FRIEND/be_db/BackEndStartup.csproj",
         "projectName": "BackEndStartup",
-        "projectPath": "/home/pablob123/IT490/BackEndStartup.csproj",
+        "projectPath": "/home/pablob123/IT490 Project/IT490-CHEFS-BEST-FRIEND/be_db/BackEndStartup.csproj",
         "packagesPath": "/home/pablob123/.nuget/packages/",
-        "outputPath": "/home/pablob123/IT490/obj/",
+        "outputPath": "/home/pablob123/IT490 Project/IT490-CHEFS-BEST-FRIEND/be_db/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/home/pablob123/.nuget/NuGet/NuGet.Config"

@@ -1,0 +1,1 @@
+echo "Listening for API requests on 'bedb.rpc'...\n"
